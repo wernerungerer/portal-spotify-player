@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
@@ -37,6 +38,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
     maxAge: 3600000
   }
 }));
