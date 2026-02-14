@@ -307,7 +307,7 @@ app.get('/api/playlists', requireAuth, async (req, res) => {
 app.get('/api/playlists/:id', requireAuth, async (req, res) => {
   try {
     const token = await getToken(req);
-    const response = await axios.get(`${SPOTIFY_API_BASE}/playlists/${req.params.id}`, {
+    const response = await axios.get(`${SPOTIFY_API_BASE}/playlists/${req.params.id}?market=from_token`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     res.json(response.data);

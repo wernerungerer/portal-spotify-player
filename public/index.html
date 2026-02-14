@@ -1229,7 +1229,7 @@ async function renderNpfRightPanel(state, currentTrack, sdkNextTracks, contextUr
           const isCurrent = t.uri === currentTrack.uri;
           const img = t.album && t.album.images ? (t.album.images[t.album.images.length > 1 ? 1 : 0]?.url || '') : '';
           return `
-            <div class="npf-queue-item ${isCurrent ? 'now-playing-item' : ''}" onclick="playContext('${contextUri}', ${i})">
+            <div class="npf-queue-item ${isCurrent ? 'now-playing-item' : ''}" onclick="playPlaylistTrack('${contextUri}', ${i})">
               <span class="npf-q-num">${isCurrent ? '<span class="npf-playing-indicator"><span></span><span></span><span></span></span>' : (i + 1)}</span>
               <img src="${img}" alt="">
               <div class="npf-q-info">
@@ -1442,7 +1442,7 @@ async function openPlaylist(id) {
         ${img ? `<img src="${img}" alt="${escHtml(pl.name)}">` : ''}
         <div class="detail-meta">
           <h2>${escHtml(pl.name)}</h2>
-          <p>${escHtml(pl.owner ? pl.owner.display_name : '')} · ${typeof pl.tracks === 'number' ? pl.tracks : (pl.tracks?.total ?? pl.tracks?.items?.length ?? 0)} tracks</p>
+          <p>${escHtml(pl.owner ? pl.owner.display_name : '')} · ${tracks.length || (pl.tracks?.total ?? 0)} tracks</p>
           <button class="detail-play-btn" onclick="playContext('spotify:playlist:${pl.id}')">Play</button>
         </div>
       </div>
@@ -1486,7 +1486,20 @@ async function playContext(uri, offset) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    switchTab('dashboard');
+    switchTab('nowPlayingFull');
+  } catch (e) { console.error('Play failed:', e); }
+}
+
+// Play a track within the current playlist context (preserves playlist queue)
+async function playPlaylistTrack(playlistUri, offset) {
+  const body = { context_uri: playlistUri, offset: { position: offset } };
+  try {
+    await fetch(`/api/player/play?device_id=${deviceId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    // Don't switch tabs - already on Now Playing
   } catch (e) { console.error('Play failed:', e); }
 }
 
@@ -1536,7 +1549,7 @@ async function playTrack(uri) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uris: [uri] })
     });
-    switchTab('dashboard');
+    switchTab('nowPlayingFull');
   } catch (e) { console.error('Play failed:', e); }
 }
 
