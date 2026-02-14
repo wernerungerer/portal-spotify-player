@@ -525,6 +525,144 @@
     .npf-no-playback { text-align: center; color: var(--text-secondary); font-size: 1.4rem; }
     .npf-no-playback p:last-child { margin-top: 10px; font-size: 1.1rem; color: var(--text-subdued); }
 
+    /* Now Playing Two-Panel Layout */
+    .npf-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      width: 100%;
+      height: 100%;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .npf-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .npf-right {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .npf-context-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.05);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+    .npf-context-header img {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    .npf-context-header .npf-ctx-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .npf-context-header .npf-ctx-label {
+      font-size: 0.8rem;
+      color: var(--text-subdued);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .npf-queue-section {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .npf-queue-section::-webkit-scrollbar { width: 6px; }
+    .npf-queue-section::-webkit-scrollbar-thumb { background: var(--bg-highlight); border-radius: 3px; }
+    .npf-section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-subdued);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 8px 16px 6px;
+      flex-shrink: 0;
+    }
+    .npf-queue-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      min-height: 52px;
+      transition: background 0.15s;
+    }
+    .npf-queue-item:hover { background: rgba(255,255,255,0.05); }
+    .npf-queue-item.now-playing-item { background: var(--green-dim); }
+    .npf-queue-item .npf-q-num {
+      width: 28px;
+      text-align: center;
+      color: var(--text-subdued);
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .npf-queue-item.now-playing-item .npf-q-num { color: var(--green); }
+    .npf-queue-item img {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .npf-queue-item .npf-q-info { overflow: hidden; flex: 1; }
+    .npf-queue-item .npf-q-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .npf-queue-item.now-playing-item .npf-q-title { color: var(--green); }
+    .npf-queue-item .npf-q-artist {
+      font-size: 0.8rem;
+      color: var(--text-subdued);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .npf-queue-item .npf-q-dur {
+      color: var(--text-subdued);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .npf-playing-indicator {
+      display: inline-flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+    }
+    .npf-playing-indicator span {
+      display: block;
+      width: 3px;
+      background: var(--green);
+      border-radius: 1px;
+      animation: npf-eq 0.8s ease-in-out infinite alternate;
+    }
+    .npf-playing-indicator span:nth-child(1) { height: 6px; animation-delay: 0s; }
+    .npf-playing-indicator span:nth-child(2) { height: 10px; animation-delay: 0.2s; }
+    .npf-playing-indicator span:nth-child(3) { height: 8px; animation-delay: 0.4s; }
+    @keyframes npf-eq {
+      0% { height: 4px; }
+      100% { height: 14px; }
+    }
+
     /* ========================================
        RECENTLY PLAYED TAB (full view)
        ======================================== */
@@ -694,6 +832,7 @@
         </div>
       </div>
     </div>
+    <!-- Hidden: queue data is fetched and rendered dynamically -->
 
     <!-- Playlists Tab -->
     <div class="tab-panel" id="playlists">
@@ -802,7 +941,7 @@ async function loadQuickPlaylists() {
           }
           <div style="overflow:hidden">
             <div class="qpl-name">${escHtml(pl.name)}</div>
-            <div class="qpl-count">${pl.tracks ? pl.tracks.total : 0} tracks</div>
+            <div class="qpl-count">${typeof pl.tracks === 'number' ? pl.tracks : (pl.tracks?.total ?? pl.tracks?.items?.length ?? 0)} tracks</div>
           </div>
           <button class="qpl-play" onclick="event.stopPropagation(); playContext('spotify:playlist:${pl.id}')">
             <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -987,46 +1126,185 @@ function renderWidgetNowPlaying(state) {
 }
 
 // --- Full Now Playing Tab ---
+let lastQueueFetch = 0;
+let cachedQueue = null;
+let currentPlaylistData = null;
+let lastPlaylistUri = null;
+
 function renderFullNowPlaying(state) {
   const container = document.getElementById('nowPlayingFullContent');
   const track = state.track_window.current_track;
   const { paused, shuffle, repeat_mode, position, duration } = state;
   const albumImg = track.album.images[0]?.url || '';
+  const nextTracks = state.track_window.next_tracks || [];
+  const contextUri = state.context?.uri || '';
+  const isPlaylist = contextUri.startsWith('spotify:playlist:');
 
   container.innerHTML = `
     <div class="npf-bg" style="background-image:url('${albumImg}')"></div>
-    <img class="npf-album-art" src="${albumImg}" alt="${escHtml(track.album.name)}">
-    <div class="npf-track-info">
-      <div class="npf-track-name">${escHtml(track.name)}</div>
-      <div class="npf-track-artist">${escHtml(track.artists.map(a => a.name).join(', '))}</div>
-    </div>
-    <div class="npf-progress">
-      <div class="npf-progress-bar-wrapper">
-        <span class="npf-progress-time" id="fProgressCurrent">${formatTime(position)}</span>
-        <div class="npf-progress-bar" id="fProgressBar" onclick="seekTo(event, 'fProgressBar')">
-          <div class="npf-progress-fill" id="fProgressFill" style="width:${(position / duration) * 100}%"></div>
+    <div class="npf-layout">
+      <div class="npf-left">
+        <img class="npf-album-art" src="${albumImg}" alt="${escHtml(track.album.name)}" style="width:min(320px,42vh);height:min(320px,42vh)">
+        <div class="npf-track-info">
+          <div class="npf-track-name">${escHtml(track.name)}</div>
+          <div class="npf-track-artist">${escHtml(track.artists.map(a => a.name).join(', '))}</div>
         </div>
-        <span class="npf-progress-time">${formatTime(duration)}</span>
+        <div class="npf-progress">
+          <div class="npf-progress-bar-wrapper">
+            <span class="npf-progress-time" id="fProgressCurrent">${formatTime(position)}</span>
+            <div class="npf-progress-bar" id="fProgressBar" onclick="seekTo(event, 'fProgressBar')">
+              <div class="npf-progress-fill" id="fProgressFill" style="width:${(position / duration) * 100}%"></div>
+            </div>
+            <span class="npf-progress-time">${formatTime(duration)}</span>
+          </div>
+        </div>
+        <div class="npf-controls">
+          <button class="npf-ctrl-btn ${shuffle ? 'active' : ''}" onclick="toggleShuffle()" title="Shuffle">${ICONS.shuffle}</button>
+          <button class="npf-ctrl-btn" onclick="player.previousTrack()" title="Previous">${ICONS.prev}</button>
+          <button class="npf-ctrl-btn play-pause" onclick="player.togglePlay()" title="${paused ? 'Play' : 'Pause'}">
+            ${paused ? ICONS.play : ICONS.pause}
+          </button>
+          <button class="npf-ctrl-btn" onclick="player.nextTrack()" title="Next">${ICONS.next}</button>
+          <button class="npf-ctrl-btn ${repeat_mode !== 0 ? 'active' : ''}" onclick="toggleRepeat()" title="Repeat">${ICONS.repeat}</button>
+        </div>
+        <div class="npf-volume">
+          ${ICONS.volume}
+          <div class="npf-volume-bar" id="fVolumeBar" onclick="setVolumeDash(event, 'fVolumeBar', 'fVolumeFill')">
+            <div class="npf-volume-fill" id="fVolumeFill" style="width:50%"></div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="npf-controls">
-      <button class="npf-ctrl-btn ${shuffle ? 'active' : ''}" onclick="toggleShuffle()" title="Shuffle">${ICONS.shuffle}</button>
-      <button class="npf-ctrl-btn" onclick="player.previousTrack()" title="Previous">${ICONS.prev}</button>
-      <button class="npf-ctrl-btn play-pause" onclick="player.togglePlay()" title="${paused ? 'Play' : 'Pause'}">
-        ${paused ? ICONS.play : ICONS.pause}
-      </button>
-      <button class="npf-ctrl-btn" onclick="player.nextTrack()" title="Next">${ICONS.next}</button>
-      <button class="npf-ctrl-btn ${repeat_mode !== 0 ? 'active' : ''}" onclick="toggleRepeat()" title="Repeat">${ICONS.repeat}</button>
-    </div>
-    <div class="npf-volume">
-      ${ICONS.volume}
-      <div class="npf-volume-bar" id="fVolumeBar" onclick="setVolumeDash(event, 'fVolumeBar', 'fVolumeFill')">
-        <div class="npf-volume-fill" id="fVolumeFill" style="width:50%"></div>
+      <div class="npf-right">
+        <div id="npfContextHeader"></div>
+        <div class="npf-queue-section" id="npfQueueSection">
+          <div class="loading">Loading queue...</div>
+        </div>
       </div>
     </div>
   `;
 
   startProgressTimer(position, duration, paused, 'fProgressFill', 'fProgressCurrent');
+
+  // Fetch and render the right panel
+  renderNpfRightPanel(state, track, nextTracks, contextUri, isPlaylist);
+}
+
+async function renderNpfRightPanel(state, currentTrack, sdkNextTracks, contextUri, isPlaylist) {
+  const headerEl = document.getElementById('npfContextHeader');
+  const queueEl = document.getElementById('npfQueueSection');
+  if (!headerEl || !queueEl) return;
+
+  // Fetch playlist data if playing from a playlist
+  if (isPlaylist) {
+    const playlistId = contextUri.replace('spotify:playlist:', '');
+    if (contextUri !== lastPlaylistUri || !currentPlaylistData) {
+      try {
+        const res = await fetch(`/api/playlists/${playlistId}`);
+        if (res.ok) {
+          currentPlaylistData = await res.json();
+          lastPlaylistUri = contextUri;
+        }
+      } catch (e) { console.error('Failed to fetch playlist:', e); }
+    }
+
+    if (currentPlaylistData) {
+      const plImg = currentPlaylistData.images && currentPlaylistData.images[0] ? currentPlaylistData.images[0].url : '';
+      const trackCount = currentPlaylistData.tracks ? currentPlaylistData.tracks.total : 0;
+      headerEl.innerHTML = `
+        <div class="npf-context-header">
+          ${plImg ? `<img src="${plImg}" alt="">` : ''}
+          <div style="overflow:hidden">
+            <div class="npf-ctx-label">Playing from playlist</div>
+            <div class="npf-ctx-name">${escHtml(currentPlaylistData.name)}</div>
+            <div style="font-size:0.8rem;color:var(--text-subdued)">${trackCount} tracks</div>
+          </div>
+        </div>`;
+
+      // Show playlist tracks with current track highlighted
+      const plTracks = (currentPlaylistData.tracks && currentPlaylistData.tracks.items ? currentPlaylistData.tracks.items : []).filter(t => t && t.track);
+      if (plTracks.length > 0) {
+        let html = '<div class="npf-section-title">Playlist Tracks</div>';
+        html += plTracks.map((item, i) => {
+          const t = item.track;
+          const isCurrent = t.uri === currentTrack.uri;
+          const img = t.album && t.album.images ? (t.album.images[t.album.images.length > 1 ? 1 : 0]?.url || '') : '';
+          return `
+            <div class="npf-queue-item ${isCurrent ? 'now-playing-item' : ''}" onclick="playContext('${contextUri}', ${i})">
+              <span class="npf-q-num">${isCurrent ? '<span class="npf-playing-indicator"><span></span><span></span><span></span></span>' : (i + 1)}</span>
+              <img src="${img}" alt="">
+              <div class="npf-q-info">
+                <div class="npf-q-title">${escHtml(t.name)}</div>
+                <div class="npf-q-artist">${escHtml(t.artists.map(a => a.name).join(', '))}</div>
+              </div>
+              <span class="npf-q-dur">${formatTime(t.duration_ms)}</span>
+            </div>`;
+        }).join('');
+        queueEl.innerHTML = html;
+
+        // Scroll to current track
+        setTimeout(() => {
+          const nowPlaying = queueEl.querySelector('.now-playing-item');
+          if (nowPlaying) nowPlaying.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 100);
+        return;
+      }
+    }
+  }
+
+  // Not a playlist or no playlist data - show Up Next from queue API
+  let contextLabel = 'Now Playing';
+  if (contextUri.startsWith('spotify:album:')) contextLabel = 'Playing from album';
+  else if (contextUri.startsWith('spotify:artist:')) contextLabel = 'Playing from artist';
+  else if (contextUri.startsWith('spotify:playlist:')) contextLabel = 'Playing from playlist';
+
+  headerEl.innerHTML = `
+    <div class="npf-context-header">
+      <div style="overflow:hidden">
+        <div class="npf-ctx-label">${contextLabel}</div>
+        <div class="npf-ctx-name">${escHtml(currentTrack.album?.name || currentTrack.name)}</div>
+      </div>
+    </div>`;
+
+  // Fetch queue from API
+  let queueTracks = [];
+  const now = Date.now();
+  if (now - lastQueueFetch > 3000 || !cachedQueue) {
+    try {
+      const res = await fetch('/api/player/queue');
+      if (res.ok) {
+        const data = await res.json();
+        cachedQueue = data.queue || [];
+        lastQueueFetch = now;
+      }
+    } catch (e) { console.error('Failed to fetch queue:', e); }
+  }
+  queueTracks = cachedQueue || [];
+
+  // Fall back to SDK next tracks if queue API returned nothing
+  if (queueTracks.length === 0 && sdkNextTracks.length > 0) {
+    queueTracks = sdkNextTracks;
+  }
+
+  if (queueTracks.length === 0) {
+    queueEl.innerHTML = '<div class="npf-section-title">Up Next</div><div class="loading" style="padding:20px">No upcoming tracks</div>';
+    return;
+  }
+
+  let html = '<div class="npf-section-title">Up Next</div>';
+  html += queueTracks.slice(0, 30).map((t, i) => {
+    const img = t.album && t.album.images ? (t.album.images[t.album.images.length > 1 ? 1 : 0]?.url || '') : '';
+    return `
+      <div class="npf-queue-item" onclick="playTrack('${t.uri}')">
+        <span class="npf-q-num">${i + 1}</span>
+        <img src="${img}" alt="">
+        <div class="npf-q-info">
+          <div class="npf-q-title">${escHtml(t.name)}</div>
+          <div class="npf-q-artist">${escHtml(t.artists.map(a => a.name).join(', '))}</div>
+        </div>
+        <span class="npf-q-dur">${formatTime(t.duration_ms)}</span>
+      </div>`;
+  }).join('');
+  queueEl.innerHTML = html;
 }
 
 // --- Progress Timer ---
@@ -1131,7 +1409,7 @@ async function loadPlaylists() {
             : `<div class="img-placeholder"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>`
           }
           <div class="pl-name" title="${escHtml(pl.name)}">${escHtml(pl.name)}</div>
-          <div class="pl-count">${pl.tracks ? pl.tracks.total : 0} tracks</div>
+          <div class="pl-count">${typeof pl.tracks === 'number' ? pl.tracks : (pl.tracks?.total ?? pl.tracks?.items?.length ?? 0)} tracks</div>
         </div>`;
     }).join('');
   } catch (e) {
@@ -1164,7 +1442,7 @@ async function openPlaylist(id) {
         ${img ? `<img src="${img}" alt="${escHtml(pl.name)}">` : ''}
         <div class="detail-meta">
           <h2>${escHtml(pl.name)}</h2>
-          <p>${escHtml(pl.owner ? pl.owner.display_name : '')} · ${pl.tracks ? pl.tracks.total : 0} tracks</p>
+          <p>${escHtml(pl.owner ? pl.owner.display_name : '')} · ${typeof pl.tracks === 'number' ? pl.tracks : (pl.tracks?.total ?? pl.tracks?.items?.length ?? 0)} tracks</p>
           <button class="detail-play-btn" onclick="playContext('spotify:playlist:${pl.id}')">Play</button>
         </div>
       </div>

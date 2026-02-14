@@ -316,6 +316,19 @@ app.get('/api/playlists/:id', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/player/queue', requireAuth, async (req, res) => {
+  try {
+    const token = await getToken(req);
+    const response = await axios.get(`${SPOTIFY_API_BASE}/me/player/queue`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    res.json(response.data);
+  } catch (err) {
+    if (err.response?.status === 204) return res.json({ queue: [] });
+    res.status(err.response?.status || 500).json({ error: err.message });
+  }
+});
+
 app.get('/api/recently-played', requireAuth, async (req, res) => {
   try {
     const token = await getToken(req);
